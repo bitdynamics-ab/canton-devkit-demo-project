@@ -38,22 +38,54 @@ flowchart LR
     Backend[Node backend]
     Frontend[React UI]
   end
+
   subgraph localnet [LocalNet Docker stack]
-    JSON["JSON Ledger API\njson-ledger-api.localhost"]
-    Admin[Participant Admin API]
-    Scan[Scan / Wallet UIs]
+    subgraph svNode [Super Validator node]
+      SVParticipant["Participant + validator"]
+      Sync["Synchronizer\nsequencer + mediator"]
+      ScanUI["Scan explorer\nscan.localhost"]
+    end
+
+    subgraph appUserNode [App-user node]
+      AppUserJSON["JSON Ledger API\njson-ledger-api.localhost"]
+      AppUserAdmin[Admin API]
+      Alice["Alice party"]
+    end
+
+    subgraph appProviderNode [App-provider node]
+      AppProviderJSON["JSON Ledger API\njson-ledger-api.localhost"]
+      AppProviderAdmin[Admin API]
+      Bob["Bob party"]
+    end
   end
+
   Daml -->|"dpm build"| DAR[.daml/dist/*.dar]
-  DAR -->|"localnet dar build-upload"| Admin
+  DAR -->|"dar build-upload --all-participants"| AppUserAdmin
+  DAR --> AppProviderAdmin
+
   DevKit --> localnet
   Frontend -->|REST| Backend
-  Backend -->|"Bearer JWT + party"| JSON
+  Backend -->|"Alice JWT + party"| AppUserJSON
+  Backend -->|"Bob JWT + party"| AppProviderJSON
   DevKit -->|"localnet env"| Backend
+
+  AppUserJSON --- Sync
+  AppProviderJSON --- Sync
+  SVParticipant --- Sync
+  ScanUI --> SVParticipant
 ```
 
-**Parties:** Use built-in LocalNet roles on **separate participants** — Alice = `app-user` party on the app-user participant, Bob = `app-provider` party on the app-provider participant. Both are exported by `dpm localnet env demo --include-jwt`. No custom party allocation step.
+**LocalNet nodes** (all three brought up by `dpm localnet up`):
 
-This matches how Splice LocalNet is actually wired: three validators (SV, app-provider, app-user), each with its own participant node and JSON Ledger API endpoint. A transfer from Alice to Bob is a genuine cross-participant workflow on the shared synchronizer — closer to production than routing both personas through one participant.
+| Node | Role in this demo |
+|---|---|
+| **App-user** | Alice's participant — mint IOU, propose transfer via JSON Ledger API |
+| **App-provider** | Bob's participant — list pending proposals, accept/reject via JSON Ledger API |
+| **Super Validator** | Runs the synchronizer (sequencer + mediator) and Scan explorer; not exercised by the IOU contract flow directly, but coordinates cross-participant transactions between Alice and Bob |
+
+**Parties:** Alice = `app-user` party on the app-user node; Bob = `app-provider` party on the app-provider node. Both exported by `dpm localnet env demo --include-jwt`. No custom party allocation step.
+
+A transfer from Alice to Bob is a cross-participant workflow on the shared synchronizer — closer to production than routing both personas through one node.
 
 ## Proposed repo layout
 
