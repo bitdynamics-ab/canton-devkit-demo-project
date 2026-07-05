@@ -1,0 +1,81 @@
+name: Example 1 LocalNet tests
+
+on:
+  push:
+    paths:
+      - "example-1/**"
+      - ".github/workflows/example-1-localnet-tests.yml"
+  pull_request:
+    paths:
+      - "example-1/**"
+      - ".github/workflows/example-1-localnet-tests.yml"
+
+defaults:
+  run:
+    working-directory: example-1
+
+jobs:
+  localnet-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      DEVKIT_VERSION: v0.7
+      SPLICE_VERSION: "0.6.4"
+      INSTANCE: ci
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Install canton-devkit
+        run: |
+          set -euo pipefail
+          asset="canton-devkit_${DEVKIT_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/bitdynamics-ab/canton-devkit/releases/download/${DEVKIT_VERSION}"
+          curl -fL -o "${asset}" "${base}/${asset}"
+          curl -fL -o SHA256SUMS "${base}/SHA256SUMS"
+          grep " ${asset}\$" SHA256SUMS | sha256sum -c -
+          tar -xzf "${asset}"
+          chmod +x canton-devkit
+          sudo mv canton-devkit /usr/local/bin/
+          canton-devkit version
+
+      - name: Install DPM
+        run: |
+          curl -fsSL https://get.digitalasset.com/install/dpm/install.sh | sh
+          echo "$HOME/.dpm/bin" >> "${GITHUB_PATH}"
+          dpm --version
+          dpm install package
+
+      - name: Host preflight
+        run: canton-devkit localnet doctor
+
+      - name: Start LocalNet
+        run: |
+          canton-devkit localnet up \
+            --name "${INSTANCE}" \
+            --version "${SPLICE_VERSION}"
+
+      - name: Export LocalNet environment
+        run: |
+          canton-devkit localnet env \
+            --name "${INSTANCE}" \
+            --include-jwt \
+            --format github-env >> "${GITHUB_ENV}"
+
+      - name: Build and upload DAR
+        run: |
+          dpm build
+          canton-devkit localnet dar upload "$(ls .daml/dist/*.dar | head -1)" \
+            --instance "${INSTANCE}" \
+            --all-participants
+
+      - name: Run tests
+        run: |
+          dpm test
+          npm install
+          npm test
+
+      - name: Tear down LocalNet
+        if: always()
+        run: canton-devkit localnet clean --name "${INSTANCE}" --force || true

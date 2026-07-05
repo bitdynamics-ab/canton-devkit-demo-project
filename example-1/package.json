@@ -1,0 +1,12 @@
+{
+  "name": "example-1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test test/integration.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
