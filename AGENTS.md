@@ -4,10 +4,10 @@ Repo-specific guidance for coding agents working in this repository.
 
 ## GitHub Actions
 
-- **Always use self-hosted runners** for workflows in `.github/workflows/`. Set `runs-on: self-hosted` (or a repo-specific self-hosted label if the org uses one). Do **not** use GitHub-hosted runners (`ubuntu-latest`, `macos-latest`, etc.) unless explicitly requested.
+- **Always use self-hosted runners** for workflows in `.github/workflows/`. LocalNet jobs use `runs-on: [self-hosted, Linux, X64, proxmox, e2e]`. Do **not** use GitHub-hosted runners unless explicitly requested.
 - Self-hosted jobs must clean up after themselves (containers, volumes, temp files). Use `if: always()` teardown steps for Docker/LocalNet workloads.
-- Prefer installing tools to user-writable paths (`$HOME/.local/bin`) rather than `sudo` on self-hosted machines.
-- Detect OS/arch when downloading release binaries; do not hardcode `linux_amd64` unless the workflow is scoped to Linux-only runners.
+- Prefer installing tools to user-writable paths (`$HOME/.local/bin`, `$RUNNER_TEMP`) rather than `sudo` on self-hosted machines.
+- After appending to `$GITHUB_PATH`, invoke binaries by absolute path in the **same** step (`$GITHUB_PATH` applies only to later steps).
 
 
 
