@@ -39,6 +39,27 @@ const userLedger = createLedgerClient({
 const IOU = "Iou:Iou";
 const PROPOSAL = "Iou:TransferProposal";
 
+async function waitFor<T>(
+  label: string,
+  fn: () => Promise<T>,
+  predicate: (value: T) => boolean,
+  timeoutMs = 30_000,
+  intervalMs = 500,
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  let last: T | undefined;
+
+  while (Date.now() < deadline) {
+    last = await fn();
+    if (predicate(last)) {
+      return last;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error(`Timed out waiting for ${label}: ${JSON.stringify(last)}`);
+}
+
 test("provider mints, proposes transfer, user accepts", async () => {
   await providerLedger.submitAndWait(
     [
@@ -79,11 +100,16 @@ test("provider mints, proposes transfer, user accepts", async () => {
     [providerParty],
   );
 
-  const proposalsRaw = await userLedger.getActiveContracts(userParty);
-  const proposals = parseContracts(proposalsRaw, PROPOSAL).filter(
-    (contract) => partyFromPayload(contract.payload.newOwner) === userParty,
+  const proposals = await waitFor(
+    "user transfer proposals",
+    async () => {
+      const proposalsRaw = await userLedger.getActiveContracts(userParty);
+      return parseContracts(proposalsRaw, PROPOSAL).filter(
+        (contract) => partyFromPayload(contract.payload.newOwner) === userParty,
+      );
+    },
+    (items) => items.length === 1,
   );
-  assert.equal(proposals.length, 1);
 
   await userLedger.submitAndWait(
     [
@@ -99,10 +125,15 @@ test("provider mints, proposes transfer, user accepts", async () => {
     [userParty],
   );
 
-  const userIousRaw = await userLedger.getActiveContracts(userParty);
-  const userIous = parseContracts(userIousRaw, IOU).filter(
-    (contract) => partyFromPayload(contract.payload.owner) === userParty,
+  const userIous = await waitFor(
+    "user IOUs after accept",
+    async () => {
+      const userIousRaw = await userLedger.getActiveContracts(userParty);
+      return parseContracts(userIousRaw, IOU).filter(
+        (contract) => partyFromPayload(contract.payload.owner) === userParty,
+      );
+    },
+    (items) => items.length === 1,
   );
-  assert.equal(userIous.length, 1);
   assert.equal(Number(userIous[0].payload.amount), 42);
 });
