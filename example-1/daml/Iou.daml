@@ -1,0 +1,47 @@
+module Iou where
+
+template Iou
+  with
+    issuer : Party
+    owner : Party
+    amount : Decimal
+    currency : Text
+  where
+    signatory issuer, owner
+
+    choice ProposeTransfer : ContractId TransferProposal
+      with
+        newOwner : Party
+      controller owner
+      do
+        create TransferProposal with
+          issuer
+          owner
+          newOwner
+          amount
+          currency
+
+template TransferProposal
+  with
+    issuer : Party
+    owner : Party
+    newOwner : Party
+    amount : Decimal
+    currency : Text
+  where
+    signatory owner
+    observer newOwner
+
+    choice Accept : ContractId Iou
+      controller newOwner
+      do
+        create Iou with
+          issuer
+          owner = newOwner
+          amount
+          currency
+
+    choice Reject : ()
+      controller newOwner
+      do
+        return ()

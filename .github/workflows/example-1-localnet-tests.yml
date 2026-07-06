@@ -1,0 +1,138 @@
+name: Example 1 LocalNet tests
+
+on:
+  push:
+    paths:
+      - "example-1/**"
+      - ".github/workflows/example-1-localnet-tests.yml"
+      - "AGENTS.md"
+  pull_request:
+    paths:
+      - "example-1/**"
+      - ".github/workflows/example-1-localnet-tests.yml"
+      - "AGENTS.md"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: example-1
+
+jobs:
+  localnet-tests:
+    runs-on: [self-hosted, Linux, X64, proxmox, e2e]
+    timeout-minutes: 45
+
+    env:
+      DEVKIT_VERSION: v0.12.2
+      SPLICE_VERSION: "0.6.4"
+      INSTANCE: ci
+      # Keep in sync with canton-devkit/.github/workflows/e2e-test-dpm-installation.yml
+      DPM_VERSION: "1.0.16"
+      DPM_LINUX_SHA256: "387421d4b3d0e799f05cde1f5c2adc704acd2824796d436861602eb2be759874"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Verify Docker daemon
+        run: |
+          docker version
+          docker compose version
+
+      - name: Install canton-devkit
+        run: |
+          set -euo pipefail
+          if command -v canton-devkit >/dev/null 2>&1; then
+            canton-devkit version
+            exit 0
+          fi
+          asset="canton-devkit_${DEVKIT_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/bitdynamics-ab/canton-devkit/releases/download/${DEVKIT_VERSION}"
+          curl -fL -o "${asset}" "${base}/${asset}"
+          curl -fL -o SHA256SUMS "${base}/SHA256SUMS"
+          grep " ${asset}\$" SHA256SUMS | sha256sum -c -
+          tar -xzf "${asset}"
+          chmod +x canton-devkit
+          install_dir="${HOME}/.local/bin"
+          mkdir -p "${install_dir}"
+          mv canton-devkit "${install_dir}/"
+          echo "${install_dir}" >> "${GITHUB_PATH}"
+          "${install_dir}/canton-devkit" version
+
+      - name: Install DPM
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          if command -v dpm >/dev/null 2>&1; then
+            DPM_BIN="$(command -v dpm)"
+          else
+            tar="${RUNNER_TEMP}/dpm-${DPM_VERSION}-linux-amd64.tar.gz"
+            curl -sSfL \
+              "https://github.com/digital-asset/dpm/releases/download/${DPM_VERSION}/dpm-${DPM_VERSION}-linux-amd64.tar.gz" \
+              -o "$tar"
+            echo "${DPM_LINUX_SHA256}  ${tar}" | sha256sum --check --strict -
+            bindir="${RUNNER_TEMP}/dpm-bin"
+            mkdir -p "$bindir"
+            tar -xzf "$tar" -C "$bindir" dpm
+            chmod 0755 "$bindir/dpm"
+            echo "$bindir" >> "$GITHUB_PATH"
+            DPM_BIN="$bindir/dpm"
+          fi
+          "$DPM_BIN" --version
+          SDK_VERSION="$(awk '/^sdk-version:/ {print $2}' example-1/daml.yaml)"
+          "$DPM_BIN" install "${SDK_VERSION}"
+
+      - name: Clean stale LocalNet state
+        run: canton-devkit localnet clean --name "${INSTANCE}" --force || true
+
+      - name: Host preflight
+        run: canton-devkit localnet doctor
+
+      - name: Start LocalNet
+        run: |
+          canton-devkit localnet up \
+            --name "${INSTANCE}" \
+            --version "${SPLICE_VERSION}"
+
+      - name: Seed role parties
+        run: |
+          set -euo pipefail
+          state_file="${HOME}/.canton-devkit/localnet/${INSTANCE}/state.json"
+          for role in app-user app-provider; do
+            endpoint="localhost:$(jq -r --arg role "${role}" '.ports["participant_ledger_\($role)"]' "${state_file}")"
+            canton-devkit localnet token party ls \
+              --instance "${INSTANCE}" \
+              --role "${role}" \
+              --endpoint "${endpoint}" \
+              >/dev/null
+          done
+
+      - name: Export LocalNet environment
+        run: |
+          canton-devkit localnet env \
+            --name "${INSTANCE}" \
+            --include-jwt \
+            --format github-env >> "${GITHUB_ENV}"
+
+      - name: Build and upload DAR
+        run: |
+          dpm build
+          canton-devkit localnet dar upload "$(ls .daml/dist/*.dar | head -1)" \
+            --instance "${INSTANCE}" \
+            --all-participants
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Run integration tests
+        run: |
+          npm install
+          npm test
+
+      - name: Tear down LocalNet
+        if: always()
+        run: canton-devkit localnet clean --name "${INSTANCE}" --force || true

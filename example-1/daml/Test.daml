@@ -1,0 +1,31 @@
+module Test where
+
+import Daml.Script
+import Iou
+
+testIouTransfer : Script ()
+testIouTransfer = script do
+  provider <- allocateParty "Provider"
+  user <- allocateParty "User"
+
+  iouCid <- submit provider do
+    createCmd Iou with
+      issuer = provider
+      owner = provider
+      amount = 100.0
+      currency = "USD"
+
+  proposalCid <- submit provider do
+    exerciseCmd iouCid ProposeTransfer with newOwner = user
+
+  _ <- submit user do
+    exerciseCmd proposalCid Accept
+
+  userIous <- query @Iou user
+  assertMsg "User should own one IOU after accept" (length userIous == 1)
+
+  let [(iouCid2, iou)] = userIous
+  assertMsg "Amount should be preserved" (iou.amount == 100.0)
+  assertMsg "Owner should be user" (iou.owner == user)
+
+  return ()
