@@ -84,6 +84,13 @@ jobs:
           SDK_VERSION="$(awk '/^sdk-version:/ {print $2}' example-1/daml.yaml)"
           "$DPM_BIN" install "${SDK_VERSION}"
 
+      - name: Set up Java
+        uses: actions/setup-java@b40d281de92fdd9b099dfbc0897a73a268645873 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: false
+
       - name: Clean stale LocalNet state
         run: canton-devkit localnet clean --name "${INSTANCE}" --force || true
 
@@ -95,6 +102,19 @@ jobs:
           canton-devkit localnet up \
             --name "${INSTANCE}" \
             --version "${SPLICE_VERSION}"
+
+      - name: Seed role parties
+        run: |
+          set -euo pipefail
+          state_file="${HOME}/.canton-devkit/localnet/${INSTANCE}/state.json"
+          for role in app-user app-provider; do
+            endpoint="localhost:$(jq -r --arg role "${role}" '.ports["participant_ledger_\($role)"]' "${state_file}")"
+            canton-devkit localnet token party ls \
+              --instance "${INSTANCE}" \
+              --role "${role}" \
+              --endpoint "${endpoint}" \
+              >/dev/null
+          done
 
       - name: Export LocalNet environment
         run: |
