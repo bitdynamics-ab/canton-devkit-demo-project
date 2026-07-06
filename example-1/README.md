@@ -95,7 +95,7 @@ The provider mints and proposes on the **app-provider** participant. The user ac
 
 ## CI
 
-GitHub Actions workflow [`.github/workflows/example-1-localnet-tests.yml`](../.github/workflows/example-1-localnet-tests.yml) runs on a **self-hosted runner**, spins up a throwaway LocalNet, runs `dpm test` and the cross-participant integration test, then tears down.
+GitHub Actions workflow [`.github/workflows/example-1-localnet-tests.yml`](../.github/workflows/example-1-localnet-tests.yml) runs on a **self-hosted runner**, spins up a throwaway LocalNet, runs the cross-participant integration test (`npm test`), then tears down. Run `dpm test` locally (requires Java 17).
 
 ## Troubleshooting
 
