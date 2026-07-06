@@ -24,6 +24,17 @@ trap cleanup EXIT
 
 localnet doctor
 localnet up --name "$INSTANCE" --version "$SPLICE_VERSION"
+
+state_file="${HOME}/.canton-devkit/localnet/${INSTANCE}/state.json"
+for role in app-user app-provider; do
+  endpoint="localhost:$(jq -r --arg role "${role}" '.ports["participant_ledger_\($role)"]' "${state_file}")"
+  localnet token party ls \
+    --instance "$INSTANCE" \
+    --role "${role}" \
+    --endpoint "${endpoint}" \
+    >/dev/null
+done
+
 eval "$(localnet env --name "$INSTANCE" --include-jwt)"
 
 dpm build
