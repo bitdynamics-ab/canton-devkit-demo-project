@@ -93,7 +93,7 @@ The provider mints and proposes on the **app-provider** participant. The user ac
 
 ## CI
 
-GitHub Actions workflow [`.github/workflows/example-1-localnet-tests.yml`](../.github/workflows/example-1-localnet-tests.yml) spins up a throwaway LocalNet, runs `dpm test` and the cross-participant integration test, then tears down.
+GitHub Actions workflow [`.github/workflows/example-1-localnet-tests.yml`](../.github/workflows/example-1-localnet-tests.yml) runs on the **self-hosted Proxmox e2e runner** (`[self-hosted, Linux, X64, proxmox, e2e]`), spins up a throwaway LocalNet, runs `dpm test` and the cross-participant integration test, then tears down.
 
 ## Troubleshooting
 

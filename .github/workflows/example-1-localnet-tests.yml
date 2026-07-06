@@ -5,10 +5,15 @@ on:
     paths:
       - "example-1/**"
       - ".github/workflows/example-1-localnet-tests.yml"
+      - "AGENTS.md"
   pull_request:
     paths:
       - "example-1/**"
       - ".github/workflows/example-1-localnet-tests.yml"
+      - "AGENTS.md"
+
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -16,20 +21,34 @@ defaults:
 
 jobs:
   localnet-tests:
-    runs-on: ubuntu-latest
+    # LocalNet needs Docker; use the same Proxmox e2e runner as canton-devkit.
+    runs-on: [self-hosted, Linux, X64, proxmox, e2e]
+    timeout-minutes: 45
 
     env:
       DEVKIT_VERSION: v0.7
       SPLICE_VERSION: "0.6.4"
       INSTANCE: ci
+      # Keep in sync with canton-devkit/.github/workflows/e2e-test-dpm-installation.yml
+      DPM_VERSION: "1.0.16"
+      DPM_LINUX_SHA256: "387421d4b3d0e799f05cde1f5c2adc704acd2824796d436861602eb2be759874"
 
     steps:
       - name: Check out repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
+      - name: Verify Docker daemon
+        run: |
+          docker version
+          docker compose version
+
       - name: Install canton-devkit
         run: |
           set -euo pipefail
+          if command -v canton-devkit >/dev/null 2>&1; then
+            canton-devkit version
+            exit 0
+          fi
           asset="canton-devkit_${DEVKIT_VERSION}_linux_amd64.tar.gz"
           base="https://github.com/bitdynamics-ab/canton-devkit/releases/download/${DEVKIT_VERSION}"
           curl -fL -o "${asset}" "${base}/${asset}"
@@ -37,15 +56,34 @@ jobs:
           grep " ${asset}\$" SHA256SUMS | sha256sum -c -
           tar -xzf "${asset}"
           chmod +x canton-devkit
-          sudo mv canton-devkit /usr/local/bin/
-          canton-devkit version
+          install_dir="${HOME}/.local/bin"
+          mkdir -p "${install_dir}"
+          mv canton-devkit "${install_dir}/"
+          echo "${install_dir}" >> "${GITHUB_PATH}"
+          "${install_dir}/canton-devkit" version
 
       - name: Install DPM
         run: |
-          curl -fsSL https://get.digitalasset.com/install/dpm/install.sh | sh
-          echo "$HOME/.dpm/bin" >> "${GITHUB_PATH}"
-          dpm --version
+          set -euo pipefail
+          if command -v dpm >/dev/null 2>&1; then
+            dpm --version
+          else
+            tar="${RUNNER_TEMP}/dpm-${DPM_VERSION}-linux-amd64.tar.gz"
+            curl -sSfL \
+              "https://github.com/digital-asset/dpm/releases/download/${DPM_VERSION}/dpm-${DPM_VERSION}-linux-amd64.tar.gz" \
+              -o "$tar"
+            echo "${DPM_LINUX_SHA256}  ${tar}" | sha256sum --check --strict -
+            bindir="${RUNNER_TEMP}/dpm-bin"
+            mkdir -p "$bindir"
+            tar -xzf "$tar" -C "$bindir" dpm
+            chmod 0755 "$bindir/dpm"
+            echo "$bindir" >> "$GITHUB_PATH"
+            "$bindir/dpm" --version
+          fi
           dpm install package
+
+      - name: Clean stale LocalNet state
+        run: canton-devkit localnet clean --name "${INSTANCE}" --force || true
 
       - name: Host preflight
         run: canton-devkit localnet doctor
