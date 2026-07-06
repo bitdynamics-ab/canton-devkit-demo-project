@@ -85,11 +85,22 @@ jobs:
           "$DPM_BIN" install "${SDK_VERSION}"
 
       - name: Set up Java
-        uses: actions/setup-java@b40d281de92fdd9b099dfbc0897a73a268645873 # v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: false
+        run: |
+          set -euo pipefail
+          if command -v java >/dev/null 2>&1; then
+            java -version
+            exit 0
+          fi
+          for java_home in /usr/lib/jvm/java-17-openjdk-amd64 /usr/lib/jvm/temurin-17-jdk-amd64; do
+            if [ -x "${java_home}/bin/java" ]; then
+              echo "JAVA_HOME=${java_home}" >> "${GITHUB_ENV}"
+              echo "${java_home}/bin" >> "${GITHUB_PATH}"
+              "${java_home}/bin/java" -version
+              exit 0
+            fi
+          done
+          echo "Java 17 not found on runner PATH or common locations" >&2
+          exit 1
 
       - name: Clean stale LocalNet state
         run: canton-devkit localnet clean --name "${INSTANCE}" --force || true
