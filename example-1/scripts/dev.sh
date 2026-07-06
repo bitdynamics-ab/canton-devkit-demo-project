@@ -13,10 +13,12 @@ localnet() {
 }
 
 INSTANCE="${INSTANCE:-demo}"
+DEVKIT_VERSION="${DEVKIT_VERSION:-v0.12.2}"
+SPLICE_VERSION="${SPLICE_VERSION:-0.6.4}"
 
 if ! localnet status --name "$INSTANCE" >/dev/null 2>&1; then
   echo "Starting LocalNet instance '$INSTANCE'..."
-  localnet up --name "$INSTANCE"
+  localnet up --name "$INSTANCE" --version "$SPLICE_VERSION"
 fi
 
 eval "$(localnet env --name "$INSTANCE" --include-jwt)"

@@ -12,12 +12,14 @@ Each frontend talks only to its own backend. JWTs and JSON Ledger API calls stay
 - Docker Desktop / Engine with Compose v2
 - ~8 GB RAM allocated to Docker
 - [DPM](https://docs.canton.network/sdks-tools/cli-tools/dpm) (`dpm install package`)
-- [canton-devkit](https://github.com/bitdynamics-ab/canton-devkit) standalone binary **or** the DPM component
+- [canton-devkit](https://github.com/bitdynamics-ab/canton-devkit) **v0.12.2** standalone binary **or** the DPM component
 - Node.js 20+
 
 ```bash
 canton-devkit localnet doctor   # or: dpm localnet doctor
 ```
+
+**Pinned versions:** canton-devkit `v0.12.2`, Splice LocalNet `0.6.4` (see `Makefile`).
 
 ## Quick start
 
@@ -93,7 +95,7 @@ The provider mints and proposes on the **app-provider** participant. The user ac
 
 ## CI
 
-GitHub Actions workflow [`.github/workflows/example-1-localnet-tests.yml`](../.github/workflows/example-1-localnet-tests.yml) runs on the **self-hosted Proxmox e2e runner** (`[self-hosted, Linux, X64, proxmox, e2e]`), spins up a throwaway LocalNet, runs `dpm test` and the cross-participant integration test, then tears down.
+GitHub Actions workflow [`.github/workflows/example-1-localnet-tests.yml`](../.github/workflows/example-1-localnet-tests.yml) runs on a **self-hosted runner**, spins up a throwaway LocalNet, runs `dpm test` and the cross-participant integration test, then tears down.
 
 ## Troubleshooting
 

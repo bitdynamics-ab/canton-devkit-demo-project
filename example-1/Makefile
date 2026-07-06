@@ -1,4 +1,5 @@
 INSTANCE ?= demo
+DEVKIT_VERSION ?= v0.12.2
 SPLICE_VERSION ?= 0.6.4
 
 .PHONY: up down build upload test dev doctor clean

@@ -13,6 +13,7 @@ localnet() {
 }
 
 INSTANCE="${INSTANCE:-ci}"
+DEVKIT_VERSION="${DEVKIT_VERSION:-v0.12.2}"
 SPLICE_VERSION="${SPLICE_VERSION:-0.6.4}"
 
 cleanup() {
