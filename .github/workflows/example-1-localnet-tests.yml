@@ -65,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           if command -v dpm >/dev/null 2>&1; then
-            dpm --version
+            DPM_BIN="$(command -v dpm)"
           else
             tar="${RUNNER_TEMP}/dpm-${DPM_VERSION}-linux-amd64.tar.gz"
             curl -sSfL \
@@ -77,9 +77,11 @@ jobs:
             tar -xzf "$tar" -C "$bindir" dpm
             chmod 0755 "$bindir/dpm"
             echo "$bindir" >> "$GITHUB_PATH"
-            "$bindir/dpm" --version
+            DPM_BIN="$bindir/dpm"
           fi
-          dpm install package
+          "$DPM_BIN" --version
+          SDK_VERSION="$(awk '/^sdk-version:/ {print $2}' daml.yaml)"
+          "$DPM_BIN" install "${SDK_VERSION}"
 
       - name: Clean stale LocalNet state
         run: canton-devkit localnet clean --name "${INSTANCE}" --force || true
