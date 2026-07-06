@@ -104,5 +104,5 @@ test("provider mints, proposes transfer, user accepts", async () => {
     (contract) => partyFromPayload(contract.payload.owner) === userParty,
   );
   assert.equal(userIous.length, 1);
-  assert.equal(userIous[0].payload.amount, "42.0");
+  assert.equal(Number(userIous[0].payload.amount), 42);
 });
