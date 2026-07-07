@@ -20,6 +20,11 @@ Repo-specific guidance for coding agents working in this repository.
 
 
 
+## Pull requests
+
+- If tests fail in a PR because of the new changes, always try to fix them and make them pass.
+
+
 ## Commits
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/).
